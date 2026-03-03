@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>小吴游戏</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+
+<meta name="generator" content="Scirra Construct">
+
+	<link rel="manifest" href="appmanifest.json">
+	<link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128.png">
+	<link rel="apple-touch-icon" sizes="256x256" href="icons/icon-256.png">
+	<link rel="icon" type="image/png" href="icons/icon-256.png">
+
+<link rel="stylesheet" href="./css/style.css">
+
+<style>
+	/* 广告浮窗按钮样式 */
+	#ad-floater {
+		position: fixed;
+		bottom: 20px;
+		right: 20px;
+		z-index: 99999;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		color: white;
+		border: none;
+		border-radius: 50px;
+		padding: 15px 25px;
+		font-size: 16px;
+		font-weight: bold;
+		cursor: pointer;
+		box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+		transition: all 0.3s ease;
+		animation: pulse 2s infinite;
+		display: none;
+	}
+
+	#ad-floater:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+	}
+
+	#ad-floater:active {
+		transform: translateY(0);
+	}
+
+	#ad-floater.show {
+		display: block;
+	}
+
+	@keyframes pulse {
+		0%, 100% {
+			box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+		}
+		50% {
+			box-shadow: 0 4px 25px rgba(102, 126, 234, 0.7);
+		}
+	}
+
+	/* 广告提示框 */
+	#ad-toast {
+		position: fixed;
+		top: 20px;
+		left: 50%;
+		transform: translateX(-50%);
+		background: rgba(0, 0, 0, 0.8);
+		color: white;
+		padding: 15px 30px;
+		border-radius: 10px;
+		z-index: 100000;
+		font-size: 14px;
+		display: none;
+		white-space: nowrap;
+	}
+
+	#ad-toast.show {
+		display: block;
+		animation: fadeIn 0.3s ease;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) translateY(-20px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
+	}
+</style>
+
+
+
+</head>
+<body>
+
+<!-- 广告浮窗按钮 -->
+<button id="ad-floater">观看广告得奖励</button>
+
+<!-- 广告提示框 -->
+<div id="ad-toast"></div>
+
+<script>
+if (location.protocol.substr(0, 4) === "file")
+{
+	alert("Web exports won't work until you upload them. (When running on the file: protocol, browsers block many features from working for security reasons.)");
+}
+</script>
+	<script src="scripts/box2d.wasm.js"></script>
+	<noscript>
+		<div id="notSupportedWrap">
+			<h2 id="notSupportedTitle">This content requires JavaScript</h2>
+			<p class="notSupportedMessage">JavaScript appears to be disabled. Please enable it to view this content.</p>
+		</div>
+	</noscript>
+	<script src="scripts/supportcheck.js"></script>
+	<script src="scripts/offlineclient.js" type="module"></script>
+	<script src="scripts/main.js" type="module"></script>
+	<script src="scripts/register-sw.js" type="module"></script>
+
+	<!-- 广告 JSBridge 功能 -->
+	<script>
+	// 广告相关变量
+	let adLoaded = false;
+	let adRewardAmount = 0;
+
+	// 设置广告回调
+	window.adCallback = function(event, data) {
+		console.log('[AdBridge]', event, data);
+		
+		switch(event) {
+			case 'onAdLoaded':
+				adLoaded = true;
+				showToast('广告已加载');
+				break;
+				
+			case 'onAdShow':
+			case 'onAdShowed':
+				showToast('广告展示中...');
+				break;
+				
+			case 'onReward':
+				adRewardAmount = parseInt(data) || 0;
+				console.log('获得奖励: ' + adRewardAmount);
+				showToast('🎉 获得 ' + adRewardAmount + ' 金币！');
+				// 给游戏发奖励（可以通过其他方式调用游戏函数）
+				giveGameReward(adRewardAmount);
+				break;
+				
+			case 'onAdDismissed':
+				adLoaded = false;
+				showToast('广告已关闭');
+				// 重新预加载广告
+				setTimeout(function() {
+					loadAd();
+				}, 2000);
+				break;
+				
+			case 'onAdFailed':
+				adLoaded = false;
+				showToast('❌ 广告加载失败: ' + data);
+				// 重新尝试加载
+				setTimeout(function() {
+					loadAd();
+				}, 5000);
+				break;
+				
+			case 'onAdFailedToShow':
+				showToast('❌ 广告展示失败: ' + data);
+				break;
+		}
+	};
+
+	// 加载广告
+	function loadAd() {
+		if (typeof window.AdBridge !== 'undefined') {
+			try {
+				window.AdBridge.loadRewardedAd();
+			} catch (e) {
+				console.error('加载广告失败:', e);
+			}
+		} else {
+			console.warn('AdBridge 不可用');
+		}
+	}
+
+	// 观看广告
+	function watchAd() {
+		if (typeof window.AdBridge !== 'undefined') {
+			try {
+				showToast('正在加载广告...');
+				window.AdBridge.loadAndShowRewardedAd();
+			} catch (e) {
+				console.error('观看广告失败:', e);
+				showToast('❌ 调用失败');
+			}
+		} else {
+			showToast('❌ AdBridge 不可用');
+		}
+	}
+
+	// 显示提示
+	function showToast(message) {
+		var toast = document.getElementById('ad-toast');
+		toast.textContent = message;
+		toast.classList.add('show');
+		
+		// 3秒后自动隐藏
+		setTimeout(function() {
+			toast.classList.remove('show');
+		}, 3000);
+	}
+
+	// 给游戏发奖励（可以自定义此函数）
+	function giveGameReward(amount) {
+		console.log('发放游戏奖励: ' + amount);
+		// 这里可以调用游戏的 API 来给玩家发奖励
+		// 例如：givePlayerCoins(amount);
+		// 或者触发游戏事件：game.events.emit('reward', amount);
+	}
+
+	// 页面加载完成后初始化
+	window.addEventListener('load', function() {
+		console.log('[AdBridge] 页面加载完成');
+		
+		// 延迟检查 JSBridge 是否可用
+		setTimeout(function() {
+			if (typeof window.AdBridge !== 'undefined') {
+				console.log('[AdBridge] JSBridge 可用');
+				showAdButton();
+				// 预加载广告
+				loadAd();
+			} else {
+				console.log('[AdBridge] JSBridge 不可用，等待注入...');
+				// 等待 WebView 注入 JSBridge
+				var checkCount = 0;
+				var checkInterval = setInterval(function() {
+					checkCount++;
+					if (typeof window.AdBridge !== 'undefined') {
+						console.log('[AdBridge] JSBridge 已注入');
+						clearInterval(checkInterval);
+						showAdButton();
+						loadAd();
+					} else if (checkCount > 20) {
+						console.warn('[AdBridge] 超时，JSBridge 未注入');
+						clearInterval(checkInterval);
+					}
+				}, 500);
+			}
+		}, 1000);
+	});
+
+	// 显示广告按钮
+	function showAdButton() {
+		var button = document.getElementById('ad-floater');
+		if (button) {
+			button.classList.add('show');
+			console.log('[AdBridge] 广告按钮已显示');
+		}
+	}
+
+	// 绑定按钮点击事件
+	document.addEventListener('DOMContentLoaded', function() {
+		var button = document.getElementById('ad-floater');
+		if (button) {
+			button.addEventListener('click', watchAd);
+		}
+	});
+	</script>
+
+</body>
+</html>
