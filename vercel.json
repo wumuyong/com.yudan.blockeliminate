@@ -1,12 +1,8 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
-  "headers": [
+  "rewrites": [
     {
-      "source": "/(.*)",  // 修正后的合法正则，匹配所有路径
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
-      ]
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false
